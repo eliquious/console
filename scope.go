@@ -13,20 +13,21 @@ import (
 // NewScope creates a new scope.
 func NewScope(name string, description string) *Scope {
 	scope := &Scope{
-		Name:        name,
-		Description: description,
-		commands:    map[string]*Command{},
-		subScopes:   map[string]*Scope{},
+		Name:           name,
+		Description:    description,
+		InitializeFunc: func(env *Environment) {},
+		commands:       map[string]*Command{},
+		subScopes:      map[string]*Scope{},
 	}
 
 	scope.AddCommand(&Command{
 		Use:   "use",
 		Short: "Use pushes a new scope onto the environment",
-		Suggestions: func() []string {
+		Suggestions: func(env *Environment, args []string) []string {
 			return scope.AvailableScopes()
 		},
 		EagerSuggestions: true,
-		Run: func(env *Environment, args []string) error {
+		Run: func(env *Environment, cmd *Command, args []string) error {
 			if len(args) == 0 {
 				return errors.New("use requires an argument")
 			} else if len(args) > 1 {
@@ -48,7 +49,7 @@ func NewScope(name string, description string) *Scope {
 		Use:     "exit",
 		Aliases: []string{"pop"},
 		Short:   "Exit pops a scope from the environment. Exits console if at the root scope.",
-		Run: func(env *Environment, args []string) error {
+		Run: func(env *Environment, cmd *Command, args []string) error {
 			env.Pop()
 			return nil
 		},
@@ -58,7 +59,7 @@ func NewScope(name string, description string) *Scope {
 	scope.AddCommand(&Command{
 		Use:   "quit",
 		Short: "Exits the console regardless of scope",
-		Run: func(env *Environment, args []string) error {
+		Run: func(env *Environment, cmd *Command, args []string) error {
 			os.Exit(0)
 			return nil
 		},
@@ -68,11 +69,11 @@ func NewScope(name string, description string) *Scope {
 	scope.AddCommand(&Command{
 		Use:   "help",
 		Short: "Prints help info",
-		Suggestions: func() []string {
+		Suggestions: func(env *Environment, args []string) []string {
 			return scope.AvailableCommands()
 		},
 		EagerSuggestions: true,
-		Run: func(env *Environment, args []string) error {
+		Run: func(env *Environment, cmd *Command, args []string) error {
 			if len(args) > 1 {
 				return errors.New("help accepts only 1 argument")
 			} else if len(args) == 1 {
@@ -95,13 +96,68 @@ func NewScope(name string, description string) *Scope {
 		},
 		builtin: true,
 	})
+
+	scope.AddCommand(&Command{
+		Use:   "env",
+		Short: "env lists all the environment variables for the commands",
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			keys := env.Configuration.AllKeys()
+			sort.Strings(keys)
+
+			maxLen := getMaxLength(keys)
+
+			for index := 0; index < len(keys); index++ {
+				fmt.Printf("%s   %v\n", padRight(keys[index], " ", maxLen), env.Configuration.Get(keys[index]))
+			}
+			return nil
+		},
+		builtin: true,
+	})
+	scope.AddCommand(&Command{
+		Use:              "get",
+		Short:            "Gets a current env var",
+		EagerSuggestions: true,
+		Suggestions: func(env *Environment, args []string) []string {
+			return env.Configuration.AllKeys()
+		},
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			if len(args) != 1 {
+				return errors.New("requires 1 argument")
+			}
+			fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
+			return nil
+		},
+		builtin: true,
+	})
+
+	scope.AddCommand(&Command{
+		Use:              "set",
+		Short:            "Sets an env var",
+		EagerSuggestions: true,
+		Suggestions: func(env *Environment, args []string) []string {
+			if len(args) < 2 {
+				return env.Configuration.AllKeys()
+			}
+			return []string{}
+		},
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			if len(args) != 2 {
+				return errors.New("requires 2 argument")
+			}
+			env.Configuration.Set(args[0], args[1])
+			// fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
+			return nil
+		},
+		builtin: true,
+	})
 	return scope
 }
 
 // Scope represents related commands
 type Scope struct {
-	Name        string
-	Description string
+	Name           string
+	Description    string
+	InitializeFunc func(*Environment)
 
 	commands  map[string]*Command
 	subScopes map[string]*Scope
@@ -120,7 +176,7 @@ func (s *Scope) SubScopes() map[string]*Scope {
 // AddCommand adds a command to the scope.
 func (s *Scope) AddCommand(cmd *Command) {
 	if cmd.Suggestions == nil {
-		cmd.Suggestions = func() []string { return nil }
+		cmd.Suggestions = func(*Environment, []string) []string { return nil }
 	}
 	if cmd.Flags == nil {
 		cmd.Flags = pflag.NewFlagSet(cmd.Use, pflag.ContinueOnError)

@@ -17,8 +17,8 @@ type Command struct {
 	Aliases          []string
 	Flags            *pflag.FlagSet
 	EagerSuggestions bool
-	Suggestions      func() []string
-	Run              func(env *Environment, args []string) error
+	Suggestions      func(env *Environment, args []string) []string
+	Run              func(env *Environment, cmd *Command, args []string) error
 
 	builtin bool
 }
@@ -39,7 +39,7 @@ func (cmd *Command) Execute(env *Environment, args []string) error {
 	}
 
 	if cmd.Run != nil {
-		return cmd.Run(env, cmd.Flags.Args())
+		return cmd.Run(env, cmd, cmd.Flags.Args())
 	}
 	return errors.New("'" + cmd.Use + "' command has no run function")
 }

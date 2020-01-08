@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/viper"
+
 	"github.com/c-bata/go-prompt"
 	"github.com/gookit/color"
 	"github.com/kballard/go-shellquote"
@@ -15,14 +17,15 @@ const Suggestions = "suggestions"
 
 // NewEnvironment creates a new environment with a root scope.
 func NewEnvironment(prefix string) *Environment {
-	env := &Environment{ScopeStack: make([]*Scope, 0), Prefix: prefix}
+	env := &Environment{ScopeStack: make([]*Scope, 0), Prefix: prefix, Configuration: viper.New()}
 	return env
 }
 
 // Environment manages the various cmd scopes
 type Environment struct {
-	Prefix     string
-	ScopeStack []*Scope
+	Prefix        string
+	ScopeStack    []*Scope
+	Configuration *viper.Viper
 }
 
 // ChangeLivePrefix allows for a dynamic prompt prefix
@@ -34,8 +37,24 @@ func (env *Environment) ChangeLivePrefix() (string, bool) {
 	return strings.Join(scopes, ":") + env.Prefix, true
 }
 
+// // Set sets an environment variable
+// func (env *Environment) Set(key, value string) {
+// 	env.EnvVariables[strings.ToUpper(key)] = value
+// }
+
+// // Get returns an env variable.
+// func (env *Environment) Get(key string) string {
+// 	if val, ok := env.EnvVariables[strings.ToUpper(key)]; ok {
+// 		return val
+// 	}
+// 	return ""
+// }
+
 // Push adds a scope to the environment
 func (env *Environment) Push(scope *Scope) {
+	if scope.InitializeFunc != nil {
+		scope.InitializeFunc(env)
+	}
 	env.ScopeStack = append(env.ScopeStack, scope)
 }
 
@@ -94,23 +113,30 @@ func (env *Environment) CompletorFunc(doc prompt.Document) []prompt.Suggest {
 		return []prompt.Suggest{}
 	}
 
+	// Parse the input
+	args, err := shellquote.Split(doc.TextBeforeCursor())
+	if err != nil {
+		// color.Warn.Println(err.Error())
+		return []prompt.Suggest{}
+	}
+
 	// Get suggestions from current scope
 	scope := env.CurrentScope()
-	suggestions := GetSuggestions(line, scope.Commands(), doc.GetWordBeforeCursor())
+	suggestions := GetSuggestions(env, line, scope.Commands(), doc.GetWordBeforeCursor(), args)
 	return prompt.FilterFuzzy(suggestions, doc.GetWordBeforeCursor(), true)
 }
 
 // GetSuggestions returns the suggestions for the given input and commands.
-func GetSuggestions(line string, commands map[string]*Command, prevWord string) []prompt.Suggest {
+func GetSuggestions(env *Environment, line string, commands map[string]*Command, prevWord string, args []string) []prompt.Suggest {
 	rootCompletions := []prompt.Suggest{}
 	for name, cmd := range commands {
 		if strings.HasPrefix(line, cmd.Use) {
-			return getCommandSuggestions(line, cmd, prevWord)
+			return getCommandSuggestions(env, line, cmd, prevWord, args)
 		}
 
 		for _, alias := range cmd.Aliases {
 			if strings.HasPrefix(line, alias) {
-				return getCommandSuggestions(line, cmd, prevWord)
+				return getCommandSuggestions(env, line, cmd, prevWord, args)
 			}
 		}
 
@@ -123,12 +149,12 @@ func GetSuggestions(line string, commands map[string]*Command, prevWord string) 
 	return rootCompletions
 }
 
-func getCommandSuggestions(line string, cmd *Command, prevWord string) []prompt.Suggest {
+func getCommandSuggestions(env *Environment, line string, cmd *Command, prevWord string, args []string) []prompt.Suggest {
 	var suggestions []prompt.Suggest
 
 	// Add args suggestions
 	if len(prevWord) > 0 || cmd.EagerSuggestions {
-		for _, sug := range cmd.Suggestions() {
+		for _, sug := range cmd.Suggestions(env, args) {
 			suggestions = append(suggestions, prompt.Suggest{Text: sug})
 		}
 	}

@@ -4,9 +4,6 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
-// OptionFunc changes the config for customization.
-type OptionFunc func(conf *Config)
-
 // Config is the app configuration.
 type Config struct {
 	Title           string
@@ -87,9 +84,14 @@ type Console struct {
 	rootScope *Scope
 }
 
-// AddScope addsa a scope at the root level.
+// AddScope adds a scope at the root level.
 func (c *Console) AddScope(scope *Scope) {
 	c.rootScope.AddSubScope(scope)
+}
+
+// AddCommand adds a command at the root level.
+func (c *Console) AddCommand(cmd *Command) {
+	c.rootScope.AddCommand(cmd)
 }
 
 // Environment returns the console environment
