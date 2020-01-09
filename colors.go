@@ -1,7 +1,10 @@
 package console
 
 import (
+	"fmt"
+
 	"github.com/c-bata/go-prompt"
+	"github.com/gookit/color"
 )
 
 // ColorScheme sets the color scheme for the console
@@ -26,12 +29,17 @@ var DefaultColorScheme = &ColorScheme{
 	ScrollbarBGColor:             prompt.White,
 	PrefixTextColor:              prompt.Red,
 	InputTextColor:               prompt.White,
-	DescriptionBGColor:           prompt.LightGray,
+	DescriptionBGColor:           prompt.White,
 	DescriptionTextColor:         prompt.DarkGray,
 	SuggestionBGColor:            prompt.DarkGray,
 	SuggestionTextColor:          prompt.White,
-	SelectedSuggestionBGColor:    prompt.LightGray,
+	SelectedSuggestionBGColor:    prompt.White,
 	SelectedSuggestionTextColor:  prompt.DarkGray,
 	SelectedDescriptionBGColor:   prompt.DarkGray,
-	SelectedDescriptionTextColor: prompt.LightGray,
+	SelectedDescriptionTextColor: prompt.White,
+}
+
+// PrintInfo prints info with a green label
+func PrintInfo(label string, format string, value ...interface{}) {
+	fmt.Printf("%s: %s\n", color.LightGreen.Render(label), fmt.Sprintf(format, value...))
 }

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-
-	"github.com/spf13/pflag"
 )
 
 // NewScope creates a new scope.
@@ -105,7 +103,6 @@ func NewScope(name string, description string) *Scope {
 			sort.Strings(keys)
 
 			maxLen := getMaxLength(keys)
-
 			for index := 0; index < len(keys); index++ {
 				fmt.Printf("%s   %v\n", padRight(keys[index], " ", maxLen), env.Configuration.Get(keys[index]))
 			}
@@ -118,7 +115,12 @@ func NewScope(name string, description string) *Scope {
 		Short:            "Gets a current env var",
 		EagerSuggestions: true,
 		Suggestions: func(env *Environment, args []string) []string {
-			return env.Configuration.AllKeys()
+			if len(args) < 2 {
+				keys := env.Configuration.AllKeys()
+				sort.Strings(keys)
+				return keys
+			}
+			return []string{}
 		},
 		Run: func(env *Environment, cmd *Command, args []string) error {
 			if len(args) != 1 {
@@ -136,13 +138,15 @@ func NewScope(name string, description string) *Scope {
 		EagerSuggestions: true,
 		Suggestions: func(env *Environment, args []string) []string {
 			if len(args) < 2 {
-				return env.Configuration.AllKeys()
+				keys := env.Configuration.AllKeys()
+				sort.Strings(keys)
+				return keys
 			}
 			return []string{}
 		},
 		Run: func(env *Environment, cmd *Command, args []string) error {
 			if len(args) != 2 {
-				return errors.New("requires 2 argument")
+				return errors.New("requires 2 arguments")
 			}
 			env.Configuration.Set(args[0], args[1])
 			// fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
@@ -178,15 +182,12 @@ func (s *Scope) AddCommand(cmd *Command) {
 	if cmd.Suggestions == nil {
 		cmd.Suggestions = func(*Environment, []string) []string { return nil }
 	}
-	if cmd.Flags == nil {
-		cmd.Flags = pflag.NewFlagSet(cmd.Use, pflag.ContinueOnError)
-	}
 
 	// Add help flag
-	helpFlag := cmd.Flags.Lookup("help")
+	helpFlag := cmd.Flags().Lookup("help")
 	if helpFlag == nil {
-		cmd.Flags.BoolP("help", "h", false, "Prints this help")
-		cmd.Flags.Lookup("help").Hidden = true
+		cmd.Flags().BoolP("help", "h", false, "Prints this help")
+		cmd.Flags().Lookup("help").Hidden = true
 	}
 	s.commands[cmd.Use] = cmd
 

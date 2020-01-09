@@ -3,6 +3,7 @@ package console
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -129,13 +130,29 @@ func (env *Environment) CompletorFunc(doc prompt.Document) []prompt.Suggest {
 // GetSuggestions returns the suggestions for the given input and commands.
 func GetSuggestions(env *Environment, line string, commands map[string]*Command, prevWord string, args []string) []prompt.Suggest {
 	rootCompletions := []prompt.Suggest{}
-	for name, cmd := range commands {
+
+	var commandNames []string
+	for name := range commands {
+		commandNames = append(commandNames, name)
+	}
+	sort.Strings(commandNames)
+
+	for index := 0; index < len(commandNames); index++ {
+		name := commandNames[index]
+		cmd := commands[name]
+
 		if strings.HasPrefix(line, cmd.Use) {
+			if len(args) > 0 && args[0] == cmd.Use {
+				return getCommandSuggestions(env, line, cmd, prevWord, args[0:])
+			}
 			return getCommandSuggestions(env, line, cmd, prevWord, args)
 		}
 
 		for _, alias := range cmd.Aliases {
 			if strings.HasPrefix(line, alias) {
+				if len(args) > 0 && args[0] == alias {
+					return getCommandSuggestions(env, line, cmd, prevWord, args[0:])
+				}
 				return getCommandSuggestions(env, line, cmd, prevWord, args)
 			}
 		}
@@ -160,20 +177,18 @@ func getCommandSuggestions(env *Environment, line string, cmd *Command, prevWord
 	}
 
 	// Add flags
-	// if len(strings.TrimSpace(line)) > len(strings.TrimSpace(prevWord)) {
-	cmd.Flags.VisitAll(func(flag *pflag.Flag) {
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 		if !flag.Hidden {
 			suggestions = append(suggestions, prompt.Suggest{Text: "--" + flag.Name, Description: flag.Usage})
 		}
 	})
-	// }
 
 	// Add matching flag suggestions
 	if strings.HasPrefix(prevWord, "-") && strings.HasSuffix(prevWord, "=") {
 		flagString := strings.TrimLeft(prevWord, "-")
 		flagString = strings.TrimRight(flagString, "=")
 
-		flag := cmd.Flags.Lookup(flagString)
+		flag := cmd.Flags().Lookup(flagString)
 		if flagSuggestions, ok := flag.Annotations[Suggestions]; ok {
 			for _, sug := range flagSuggestions {
 				suggestions = append(suggestions, prompt.Suggest{Text: sug})
