@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 )
 
@@ -44,27 +43,6 @@ func NewScope(name string, description string) *Scope {
 	})
 
 	scope.AddCommand(&Command{
-		Use:     "exit",
-		Aliases: []string{"pop"},
-		Short:   "Exit pops a scope from the environment. Exits console if at the root scope.",
-		Run: func(env *Environment, cmd *Command, args []string) error {
-			env.Pop()
-			return nil
-		},
-		IsBuiltIn: true,
-	})
-
-	scope.AddCommand(&Command{
-		Use:   "quit",
-		Short: "Exits the console regardless of scope",
-		Run: func(env *Environment, cmd *Command, args []string) error {
-			os.Exit(0)
-			return nil
-		},
-		IsBuiltIn: true,
-	})
-
-	scope.AddCommand(&Command{
 		Use:   "help",
 		Short: "Prints help info",
 		Suggestions: func(env *Environment, args []string) []string {
@@ -94,69 +72,6 @@ func NewScope(name string, description string) *Scope {
 		},
 		IsBuiltIn: true,
 	})
-
-	scope.AddCommand(&Command{
-		Use:   "env",
-		Short: "env lists all the environment variables for the commands",
-		Run: func(env *Environment, cmd *Command, args []string) error {
-			keys := env.Configuration.AllKeys()
-			sort.Strings(keys)
-
-			maxLen := getMaxLength(keys)
-			for index := 0; index < len(keys); index++ {
-				fmt.Printf("%s   %v\n", padRight(keys[index], " ", maxLen), env.Configuration.Get(keys[index]))
-			}
-			return nil
-		},
-		IsBuiltIn: true,
-	})
-	scope.AddCommand(&Command{
-		Use:              "get",
-		Short:            "Gets a current env var",
-		EagerSuggestions: true,
-		Suggestions: func(env *Environment, args []string) []string {
-			if len(args) < 2 {
-				keys := env.Configuration.AllKeys()
-				sort.Strings(keys)
-				return keys
-			}
-			return []string{}
-		},
-		Run: func(env *Environment, cmd *Command, args []string) error {
-			if len(args) != 1 {
-				return errors.New("requires 1 argument")
-			}
-			fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
-			return nil
-		},
-		IsBuiltIn: true,
-	})
-
-	scope.AddCommand(&Command{
-		Use:              "set",
-		Short:            "Sets an env var",
-		EagerSuggestions: true,
-		Suggestions: func(env *Environment, args []string) []string {
-			if len(args) < 2 {
-				keys := env.Configuration.AllKeys()
-				sort.Strings(keys)
-				return keys
-			}
-			return []string{}
-		},
-		Run: func(env *Environment, cmd *Command, args []string) error {
-			if len(args) != 2 {
-				return errors.New("requires 2 arguments")
-			}
-			env.Configuration.Set(args[0], args[1])
-			// fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
-			return nil
-		},
-		IsBuiltIn: true,
-	})
-
-	// add JS eval command
-	scope.AddCommand(NewEvalCommand())
 
 	return scope
 }
@@ -198,10 +113,22 @@ func (s *Scope) AddCommand(cmd *Command) {
 	for _, alias := range cmd.Aliases {
 		s.commands[alias] = cmd
 	}
+
+	// if the proagating command is added after the sub-scopes it should still propagate.
+	if cmd.ShouldPropagate {
+		for _, sub := range s.subScopes {
+			sub.AddCommand(cmd)
+		}
+	}
 }
 
 // AddSubScope adds a sub-scope.
 func (s *Scope) AddSubScope(sub *Scope) {
+	for _, cmd := range s.commands {
+		if cmd.ShouldPropagate {
+			sub.AddCommand(cmd)
+		}
+	}
 	s.subScopes[sub.Name] = sub
 }
 

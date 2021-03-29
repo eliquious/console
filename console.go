@@ -1,6 +1,11 @@
 package console
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+
 	"github.com/c-bata/go-prompt"
 )
 
@@ -17,6 +22,10 @@ type Config struct {
 func New(name string, opts ...OptionFunc) *Console {
 	env := NewEnvironment("> ")
 	rootScope := NewScope(name, "")
+
+	// setup built-in commands
+	addBuiltInCommands(rootScope)
+
 	env.Push(rootScope)
 
 	conf := &Config{
@@ -108,4 +117,92 @@ func (c *Console) Environment() *Environment {
 func (c *Console) Run() {
 	c.config.TitleScreenFunc()
 	c.prompt.Run()
+}
+
+func addBuiltInCommands(scope *Scope) {
+
+	scope.AddCommand(&Command{
+		Use:   "env",
+		Short: "env lists all the environment variables for the commands",
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			keys := env.Configuration.AllKeys()
+			sort.Strings(keys)
+
+			maxLen := getMaxLength(keys)
+			for index := 0; index < len(keys); index++ {
+				fmt.Printf("%s   %v\n", padRight(keys[index], " ", maxLen), env.Configuration.Get(keys[index]))
+			}
+			return nil
+		},
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
+	})
+	scope.AddCommand(&Command{
+		Use:              "get",
+		Short:            "Gets a current env var",
+		EagerSuggestions: true,
+		Suggestions: func(env *Environment, args []string) []string {
+			if len(args) < 2 {
+				keys := env.Configuration.AllKeys()
+				sort.Strings(keys)
+				return keys
+			}
+			return []string{}
+		},
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			if len(args) != 1 {
+				return errors.New("requires 1 argument")
+			}
+			fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
+			return nil
+		},
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
+	})
+
+	scope.AddCommand(&Command{
+		Use:              "set",
+		Short:            "Sets an env var",
+		EagerSuggestions: true,
+		Suggestions: func(env *Environment, args []string) []string {
+			if len(args) < 2 {
+				keys := env.Configuration.AllKeys()
+				sort.Strings(keys)
+				return keys
+			}
+			return []string{}
+		},
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			if len(args) != 2 {
+				return errors.New("requires 2 arguments")
+			}
+			env.Configuration.Set(args[0], args[1])
+			// fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
+			return nil
+		},
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
+	})
+	scope.AddCommand(&Command{
+		Use:     "exit",
+		Aliases: []string{"pop"},
+		Short:   "Exit pops a scope from the environment. Exits console if at the root scope.",
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			env.Pop()
+			return nil
+		},
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
+	})
+
+	scope.AddCommand(&Command{
+		Use:   "quit",
+		Short: "Exits the console regardless of scope",
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			os.Exit(0)
+			return nil
+		},
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
+	})
 }

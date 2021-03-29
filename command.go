@@ -21,6 +21,7 @@ type Command struct {
 	Suggestions      func(env *Environment, args []string) []string
 	EagerSuggestions bool
 	IsBuiltIn        bool
+	ShouldPropagate  bool
 
 	flags         *pflag.FlagSet
 	requiredFlags []string

@@ -1,4 +1,4 @@
-package console
+package js
 
 import (
 	"fmt"
@@ -6,21 +6,23 @@ import (
 
 	"github.com/c-bata/go-prompt"
 	"github.com/dop251/goja"
+	"github.com/eliquious/console"
 	"github.com/eliquious/console/colors"
 )
 
-func NewEvalCommand() *Command {
+// EvalCommand creates a command that initializes a JS interpretter.
+func EvalCommand() *console.Command {
 
 	// console config for the eval prompt
-	conf := &Config{
+	conf := &console.Config{
 		Title:           "goja",
 		Prefix:          "eval",
-		ColorScheme:     DefaultColorScheme,
+		ColorScheme:     console.DefaultColorScheme,
 		TitleScreenFunc: func() {},
 	}
 
 	// dynamic prefix function
-	var environ *Environment
+	var environ *console.Environment
 	prefixFunc := func() (string, bool) {
 		scopes := []string{}
 		for index := 0; index < len(environ.ScopeStack); index++ {
@@ -49,22 +51,22 @@ func NewEvalCommand() *Command {
 	}
 	evalPrompt := newEvalPrompt(conf, prefixFunc, executor)
 
-	command := &Command{
+	command := &console.Command{
 		Use:              "eval",
 		Short:            "Launch JS interpreter",
 		EagerSuggestions: true,
-		Run: func(env *Environment, cmd *Command, args []string) error {
+		Run: func(env *console.Environment, cmd *console.Command, args []string) error {
 			environ = env
-
 			evalPrompt.Run()
 			return nil
 		},
-		IsBuiltIn: true,
+		IsBuiltIn:       true,
+		ShouldPropagate: true,
 	}
 	return command
 }
 
-func newEvalPrompt(conf *Config, prefixFunc func() (string, bool), execFunc prompt.Executor) *prompt.Prompt {
+func newEvalPrompt(conf *console.Config, prefixFunc func() (string, bool), execFunc prompt.Executor) *prompt.Prompt {
 
 	promptOpts := []prompt.Option{
 		prompt.OptionTitle(conf.Title),

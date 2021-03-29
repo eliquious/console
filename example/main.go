@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/eliquious/console"
+	"github.com/eliquious/console/ext/js"
 )
 
 var (
@@ -29,5 +30,9 @@ func main() {
 	scope.AddCommand(cmd)
 	scope.AddSubScope(console.NewScope("account", "Access account info"))
 	shell.AddScope(scope)
+
+	// add global js interpreter
+	shell.AddCommand(js.EvalCommand())
+
 	shell.Run()
 }
