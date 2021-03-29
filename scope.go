@@ -138,6 +138,7 @@ func (s *Scope) AvailableCommands() []string {
 	for cmd := range s.commands {
 		commands = append(commands, cmd)
 	}
+	sort.Strings(commands)
 	return commands
 }
 
@@ -147,6 +148,7 @@ func (s *Scope) AvailableScopes() []string {
 	for sub := range s.subScopes {
 		scopes = append(scopes, sub)
 	}
+	sort.Strings(scopes)
 	return scopes
 }
 
