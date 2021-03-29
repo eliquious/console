@@ -1,40 +1,75 @@
 package console
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/c-bata/go-prompt"
+	"github.com/dop251/goja"
+	"github.com/eliquious/console/colors"
 )
 
-// Config is the app configuration.
-type Config struct {
-	Title           string
-	Prefix          string
-	MaxSuggestions  uint16
-	ColorScheme     *ColorScheme
-	TitleScreenFunc func()
-}
+func NewEvalCommand() *Command {
 
-// New creates a new Console.
-func New(name string, opts ...OptionFunc) *Console {
-	env := NewEnvironment("> ")
-	rootScope := NewScope(name, "")
-	env.Push(rootScope)
-
+	// console config for the eval prompt
 	conf := &Config{
-		Title:           "console",
-		Prefix:          "> ",
-		MaxSuggestions:  8,
+		Title:           "goja",
+		Prefix:          "eval",
 		ColorScheme:     DefaultColorScheme,
 		TitleScreenFunc: func() {},
 	}
 
-	for _, opt := range opts {
-		opt(conf)
+	// dynamic prefix function
+	var environ *Environment
+	prefixFunc := func() (string, bool) {
+		scopes := []string{}
+		for index := 0; index < len(environ.ScopeStack); index++ {
+			scopes = append(scopes, environ.ScopeStack[index].Name)
+		}
+		scopes = append(scopes, "eval")
+		return strings.Join(scopes, ":") + environ.Prefix, true
 	}
+
+	// create a new JS virtual machine
+	vm := goja.New()
+
+	// executor function
+	executor := func(line string) {
+		line = strings.TrimSpace(line)
+		if line == "pop" || line == "exit" {
+			fmt.Println("Press Ctrl-D to exit")
+			return
+		}
+
+		val, err := vm.RunString(line)
+		if err != nil {
+			fmt.Printf(colors.Red("error: ", err))
+		}
+		fmt.Println(val)
+	}
+	evalPrompt := newEvalPrompt(conf, prefixFunc, executor)
+
+	command := &Command{
+		Use:              "eval",
+		Short:            "Launch JS interpreter",
+		EagerSuggestions: true,
+		Run: func(env *Environment, cmd *Command, args []string) error {
+			environ = env
+
+			evalPrompt.Run()
+			return nil
+		},
+		IsBuiltIn: true,
+	}
+	return command
+}
+
+func newEvalPrompt(conf *Config, prefixFunc func() (string, bool), execFunc prompt.Executor) *prompt.Prompt {
 
 	promptOpts := []prompt.Option{
 		prompt.OptionTitle(conf.Title),
 		prompt.OptionPrefix(conf.Prefix),
-		prompt.OptionLivePrefix(env.LivePrefix),
+		prompt.OptionLivePrefix(prefixFunc),
 		prompt.OptionMaxSuggestion(conf.MaxSuggestions),
 
 		// Text colors
@@ -54,16 +89,11 @@ func New(name string, opts ...OptionFunc) *Console {
 		// Key bindings for meta key
 		prompt.OptionSwitchKeyBindMode(prompt.EmacsKeyBind),
 		prompt.OptionAddASCIICodeBind(prompt.ASCIICodeBind{
-			ASCIICode: []byte{0x1b, 127},
+			ASCIICode: []byte{0x1b, 0x7f},
 			Fn:        prompt.DeleteWord,
 		}),
 		prompt.OptionAddASCIICodeBind(prompt.ASCIICodeBind{
-			ASCIICode: []byte{0x1b, 0x08},
-			Fn:        prompt.DeleteWord,
-		}),
-		prompt.OptionAddASCIICodeBind(prompt.ASCIICodeBind{
-			// ASCIICode: []byte{27, 27, 91, 68},
-			ASCIICode: []byte{0x1b, 98},
+			ASCIICode: []byte{27, 27, 91, 68},
 			Fn:        prompt.GoLeftWord,
 		}),
 		prompt.OptionAddASCIICodeBind(prompt.ASCIICodeBind{
@@ -72,40 +102,6 @@ func New(name string, opts ...OptionFunc) *Console {
 		}),
 	}
 
-	p := prompt.New(env.ExecutorFunc, env.CompletorFunc, promptOpts...)
-	return &Console{
-		config:    conf,
-		env:       env,
-		rootScope: rootScope,
-		prompt:    p,
-	}
-}
-
-// Console runs the prompt and manages the environment.
-type Console struct {
-	config    *Config
-	env       *Environment
-	prompt    *prompt.Prompt
-	rootScope *Scope
-}
-
-// AddScope adds a scope at the root level.
-func (c *Console) AddScope(scope *Scope) {
-	c.rootScope.AddSubScope(scope)
-}
-
-// AddCommand adds a command at the root level.
-func (c *Console) AddCommand(cmd *Command) {
-	c.rootScope.AddCommand(cmd)
-}
-
-// Environment returns the console environment
-func (c *Console) Environment() *Environment {
-	return c.env
-}
-
-// Run runs the console
-func (c *Console) Run() {
-	c.config.TitleScreenFunc()
-	c.prompt.Run()
+	completer := func(prompt.Document) []prompt.Suggest { return []prompt.Suggest{} }
+	return prompt.New(execFunc, completer, promptOpts...)
 }

@@ -40,7 +40,7 @@ func NewScope(name string, description string) *Scope {
 			env.Push(sub)
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 
 	scope.AddCommand(&Command{
@@ -51,7 +51,7 @@ func NewScope(name string, description string) *Scope {
 			env.Pop()
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 
 	scope.AddCommand(&Command{
@@ -61,7 +61,7 @@ func NewScope(name string, description string) *Scope {
 			os.Exit(0)
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 
 	scope.AddCommand(&Command{
@@ -92,7 +92,7 @@ func NewScope(name string, description string) *Scope {
 			fmt.Println(scope.Usage())
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 
 	scope.AddCommand(&Command{
@@ -108,7 +108,7 @@ func NewScope(name string, description string) *Scope {
 			}
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 	scope.AddCommand(&Command{
 		Use:              "get",
@@ -129,7 +129,7 @@ func NewScope(name string, description string) *Scope {
 			fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
 
 	scope.AddCommand(&Command{
@@ -152,8 +152,12 @@ func NewScope(name string, description string) *Scope {
 			// fmt.Printf("%s   %v\n", args[0], env.Configuration.Get(args[0]))
 			return nil
 		},
-		builtin: true,
+		IsBuiltIn: true,
 	})
+
+	// add JS eval command
+	scope.AddCommand(NewEvalCommand())
+
 	return scope
 }
 
@@ -247,7 +251,7 @@ func (s *Scope) Usage() string {
 	fmt.Fprintln(&buf, "\nUser Commands:")
 	for index := 0; index < len(commands); index++ {
 		cmd := s.commands[commands[index]]
-		if !cmd.builtin {
+		if !cmd.IsBuiltIn {
 			fmt.Fprintf(&buf, "  %s    %s\n", padRight(commands[index], " ", maxLen), cmd.Short)
 		}
 	}
@@ -255,7 +259,7 @@ func (s *Scope) Usage() string {
 	fmt.Fprintln(&buf, "\nBuilt-in Commands:")
 	for index := 0; index < len(commands); index++ {
 		cmd := s.commands[commands[index]]
-		if cmd.builtin {
+		if cmd.IsBuiltIn {
 			if cmd.Use == commands[index] {
 				fmt.Fprintf(&buf, "  %s    %s\n", padRight(commands[index], " ", maxLen), cmd.Short)
 			} else {

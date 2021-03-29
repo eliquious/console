@@ -29,8 +29,8 @@ type Environment struct {
 	Configuration *viper.Viper
 }
 
-// ChangeLivePrefix allows for a dynamic prompt prefix
-func (env *Environment) ChangeLivePrefix() (string, bool) {
+// LivePrefix allows for a dynamic prompt prefix
+func (env *Environment) LivePrefix() (string, bool) {
 	scopes := []string{}
 	for index := 0; index < len(env.ScopeStack); index++ {
 		scopes = append(scopes, env.ScopeStack[index].Name)
@@ -109,7 +109,7 @@ func (env *Environment) ExecutorFunc(input string) {
 
 // CompletorFunc gets the Completer from the current scope.
 func (env *Environment) CompletorFunc(doc prompt.Document) []prompt.Suggest {
-	line := strings.TrimSpace(doc.CurrentLine())
+	line := doc.CurrentLine()
 	if strings.TrimSpace(line) == "" {
 		return []prompt.Suggest{}
 	}

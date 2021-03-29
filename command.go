@@ -20,9 +20,9 @@ type Command struct {
 	Run              func(env *Environment, cmd *Command, args []string) error
 	Suggestions      func(env *Environment, args []string) []string
 	EagerSuggestions bool
+	IsBuiltIn        bool
 
 	flags         *pflag.FlagSet
-	builtin       bool
 	requiredFlags []string
 }
 
